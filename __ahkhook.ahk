@@ -6,8 +6,8 @@ OnMessage(0x4a, "WM_COPYDATA")
 if !A_iscompiled
 	runwait, Ahk2Exe.exe /in %A_scriptName% /out ahkhook.exe /mpress 0	
 
-FileInstall, HookClass.txt, ?Dummy
 compileScript("HookClass.ahk")
+FileInstall, HookClass.txt, ?Dummy
 
 global proc
 global target   := GetCommandLineValueB("-t")
