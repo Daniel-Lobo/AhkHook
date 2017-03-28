@@ -22,7 +22,7 @@ class Hook {
 
 __new(hook, dll, function2hook, callback_options = "F")
 {
-	if ! (hModule := dllcall("GetModuleHandle", "str", "ahkhook.dll", ptr) )
+	if ! (hModule := dllcall("GetModuleHandle", "str", (A_ptrsize=4) ? "ahkhook.dll" : "ahkhook64.dll", ptr) )
 		return "Failed to get a handle to ahkhook.dll with error " A_lasterror
 	if ! (sethooks := dllcall("GetProcAddress", "ptr", hModule, "astr", "sethook", ptr)	)		
 		return "Failed to get the address of the sethook procedure with error " A_lasterror	

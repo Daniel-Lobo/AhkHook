@@ -5,33 +5,23 @@ memlib_sound(sound) {
 	:  A_windir "\media\Windows Critical Stop.wav" 	
 }
 
-
-class ProcessEntry32
-	{
-		__New(Name, ID_)
-			{
-				this.name := Name
-				this.ID  := ID_
-			}
-	}					
-
 get_process_list()
+{
+	process_list := {}
+	snapshot_handle := dllcall("CreateToolhelp32Snapshot", "int", 0x00000002, int, 0)
+		
+	varsetcapacity(lppe, 556 , 0),	numput(556, lppe, 0,Int)
+	success :=  dllcall("Process32First", "Ptr", snapshot_handle, "Ptr", &lppe)
+	process_list.insert({"name" : StrGet(&lppe + 36, 520, 0), "ID" : NumGet(lppe, 8, "Int")})    
+		
+	while success
 	{
-		process_list := {}
-		snapshot_handle := dllcall("CreateToolhelp32Snapshot", "int", 0x00000002, int, 0)
-		
-		varsetcapacity(lppe, 556 , 0),	numput(556, lppe, 0,Int)
-		success :=  dllcall("Process32First", "Ptr", snapshot_handle, "Ptr", &lppe)
-		process_list.insert(new ProcessEntry32(StrGet(&lppe + 36, 520, 0), NumGet(lppe, 8, "Int")))    
-		
-		while success
-			{
-				varsetcapacity(lppe, 556 , 0),	numput(556, lppe, 0,Int)			
-				success := dllcall("Process32Next", "Ptr", snapshot_handle, "Ptr", &lppe) 
-				process_list.insert(new ProcessEntry32(StrGet(&lppe + 36, 520, 0), NumGet(lppe, 8, "Int")))
-			}	
-		return 	process_list
-	}
+		varsetcapacity(lppe, 556 , 0),	numput(556, lppe, 0,Int)			
+		success := dllcall("Process32Next", "Ptr", snapshot_handle, "Ptr", &lppe) 
+		process_list.insert({"name" : StrGet(&lppe + 36, 520, 0), "ID" : NumGet(lppe, 8, "Int")})
+	}	
+	return 	process_list
+}
 
 open_process(ProcessID, access = "", InheritHandle = 0)
 {
@@ -44,10 +34,10 @@ open_process(ProcessID, access = "", InheritHandle = 0)
 get_process_handle(process_, access = "")
 {
 	for k, v in get_process_list()
-		{
-			if v.name = process_
-				return open_process(v.ID, access)	
-		}	
+	{
+		if v.name = process_
+			return open_process(v.ID, access)	
+	}	
 }	
 
 close_process_handle(hProcess){
@@ -61,21 +51,21 @@ write_process_memory(hProcess, adress, type_, value)
 	
 	
 	if (type_ = "array")
-		{
-			varsetcapacity(buffer, size[type_], 0)
-			loop, % value._MaxIndex()
-				Numput(value[A_index], buffer, A_index - 1, "UChar")								
-		}	
+	{
+		varsetcapacity(buffer, size[type_], 0)
+		loop, % value._MaxIndex()
+			Numput(value[A_index], buffer, A_index - 1, "UChar")								
+	}	
 	else if  (type_ = "str")
-		{
-			varsetcapacity(buffer, size[type_], 0)
-			StrPut(value, &buffer, size[type_], "UTF-16")	
-		}
+	{
+		varsetcapacity(buffer, size[type_], 0)
+		StrPut(value, &buffer, size[type_], "UTF-16")	
+	}
 	else
-		{		
-			varsetcapacity(buffer, size[type_], 0)
-			Numput(value, buffer, 0, type_)
-		}
+	{		
+		varsetcapacity(buffer, size[type_], 0)
+		Numput(value, buffer, 0, type_)
+	}
 
 
 	r := dllcall("WriteProcessMemory"
@@ -108,11 +98,11 @@ read_process_memory(hProcess, adress, type_, arraysize = "")
 		return
 				
 	if (type_ = "array")
-		{
-			return_value := []
-			loop, % arraysize 
-				return_value.insert(Numget(buffer,  A_index - 1, "UChar"))
-		}	
+	{
+		return_value := []
+		loop, % arraysize 
+			return_value.insert(Numget(buffer,  A_index - 1, "UChar"))
+	}	
 	else return_value := Numget(buffer,  0, type_)
 	return return_value			
 }
@@ -122,61 +112,61 @@ read_pointer_sequence(hprocess, baseadress, offsets)
 	pointer := read_process_memory(hprocess, baseadress, "Ptr") 
 	;fileappend, % pointer "`n", *
 	for k, offset in offsets
-		{			
-			adress := pointer + offset
-			pointer := read_process_memory(hprocess, adress, "Ptr")
-			;fileappend, % pointer "`n", *
-		}
+	{			
+		adress := pointer + offset
+		pointer := read_process_memory(hprocess, adress, "Ptr")
+		;fileappend, % pointer "`n", *
+	}
 	return [adress, pointer] ; the last "pointer" is the value 	
 }
 
 class CodeInjection
 {
 	__New(hprocess, addy, newcode)
-		{
-			format := A_FormatInteger			
-			setformat, integer, H
-			this.process_ := hprocess
-			this.addy := addy
-			this.newcode := newcode
-			;fileappend, % this.process_ ":" this.addy ":" this.newcode._maxIndex(),*
-			this.original_code := read_process_memory(hprocess, this.addy, "array", this.newcode._maxIndex())
-			;for k, v in this.original_code
-				;fileappend, % v, *		
-			setformat, integer, %format%		
-		}		
+	{
+		format := A_FormatInteger			
+		setformat, integer, H
+		this.process_ := hprocess
+		this.addy := addy
+		this.newcode := newcode
+		;fileappend, % this.process_ ":" this.addy ":" this.newcode._maxIndex(),*
+		this.original_code := read_process_memory(hprocess, this.addy, "array", this.newcode._maxIndex())
+		;for k, v in this.original_code
+			;fileappend, % v, *		
+		setformat, integer, %format%		
+	}		
 		
 	_enable()
-		{
-			return write_process_memory(this.process_, this.addy, "array", this.newcode)	
-		}	
+	{
+		return write_process_memory(this.process_, this.addy, "array", this.newcode)	
+	}	
 	
 	_disable()
-		{	
-			return write_process_memory(this.process_, this.addy, "array", this.original_code)	
-		}	
+	{	
+		return write_process_memory(this.process_, this.addy, "array", this.original_code)	
+	}	
 
 	switch()	
-		{
-			current_code := read_process_memory(this.process_, this.addy, "array", this.newcode._maxIndex())
-			for k, v in current_code
-				fileappend, % v ":" this.original_code[k] ":" this.newcode[k]"`n", *	
+	{
+		current_code := read_process_memory(this.process_, this.addy, "array", this.newcode._maxIndex())
+		for k, v in current_code
+			fileappend, % v ":" this.original_code[k] ":" this.newcode[k]"`n", *	
 			
-			if arrays_are_equal(current_code, this.original_code)
-				{
-					;fileappend, disabled, *	
-					if this._enable()
-						return memlib_sound(1)
-					else return memlib_sound(-1)
-				}	
-			else if arrays_are_equal(current_code, this.newcode)
-				{
-					;fileappend, enabled, *	
-					if this._disable()
-						return memlib_sound(0)
-					else return memlib_sound(-1)
-				}	
-		}
+		if arrays_are_equal(current_code, this.original_code)
+		{
+			;fileappend, disabled, *	
+			if this._enable()
+				return memlib_sound(1)
+			else return memlib_sound(-1)
+		}	
+		else if arrays_are_equal(current_code, this.newcode)
+		{
+			;fileappend, enabled, *	
+			if this._disable()
+				return memlib_sound(0)
+			else return memlib_sound(-1)
+		}	
+	}
 	__Delete()	{
 		this._disable()
 	}		
@@ -292,76 +282,75 @@ so there is no need to translate that part of the assembly script
 Class CodeCave
 {
 	__New(hprocess, from, code, nops = 0)
-		{
-			format := A_FormatInteger
-			setformat, integer, H
-			to := VirtualAllocEx(hprocess, code._MaxIndex() + 6 + nops)
-			if not to
-				return
-			;fileappend, % to "`n", *
-			this.orginal_code := read_process_memory(hProcess, from, "array", 6 + nops)
-			this.code := code
-			this.from := from
-			this.to := to
-			this.hprocess := hprocess
-			adress2go := ReverseInt32bytes(to)	
-			adress2return := ReverseInt32bytes(from + 6 + nops)								
+	{
+		format := A_FormatInteger
+		setformat, integer, H
+		to := VirtualAllocEx(hprocess, code._MaxIndex() + 6 + nops)
+		if not to
+			return
+		;fileappend, % to "`n", *
+		this.orginal_code := read_process_memory(hProcess, from, "array", 6 + nops)
+		this.code := code
+		this.from := from
+		this.to := to
+		this.hprocess := hprocess
+		adress2go := ReverseInt32bytes(to)	
+		adress2return := ReverseInt32bytes(from + 6 + nops)								
 			
-			this.jump_instruction := [0x68]	
-			loop, 4
-				this.jump_instruction.insert(adress2go[A_index])
-			this.jump_instruction.insert(0xc3)
-			loop, % nops
-				this.jump_instruction.insert(0x90)
-			;for k, v in this.jump_instruction 
-				;fileappend, % v "`n", *
+		this.jump_instruction := [0x68]	
+		loop, 4
+			this.jump_instruction.insert(adress2go[A_index])
+		this.jump_instruction.insert(0xc3)
+		loop, % nops
+			this.jump_instruction.insert(0x90)
+		;for k, v in this.jump_instruction 
+			;fileappend, % v "`n", *
 			
-			this.jumpback_instruction := [0x68]	
-			loop, 4
-				this.jumpback_instruction.insert(adress2return[A_index])
-			this.jumpback_instruction.insert(0xc3)	
-			;for k, v in this.jumpback_instruction 
-				;fileappend, % v "`n", *	
+		this.jumpback_instruction := [0x68]	
+		loop, 4
+			this.jumpback_instruction.insert(adress2return[A_index])
+		this.jumpback_instruction.insert(0xc3)	
+		;for k, v in this.jumpback_instruction 
+			;fileappend, % v "`n", *	
 			
-			setformat, integer, %format%
-		}
+		setformat, integer, %format%
+	}
 		
 	_enable()
-		{
-			if not write_process_memory(this.hprocess, this.from, "array", this.jump_instruction)
-				return
-			for k, v in this.jumpback_instruction
-				this.code.insert(v)							
-			return write_process_memory(this.hprocess, this.to, "array", this.code)
-		}	
+	{
+		if not write_process_memory(this.hprocess, this.from, "array", this.jump_instruction)
+			return
+		for k, v in this.jumpback_instruction
+			this.code.insert(v)							
+		return write_process_memory(this.hprocess, this.to, "array", this.code)
+	}	
 		
 	_disable()	{
-			return write_process_memory(this.hprocess, this.from, "array", this.orginal_code)				
-		}
+		return write_process_memory(this.hprocess, this.from, "array", this.orginal_code)				
+	}
 		
 	switch()	
+	{
+		if arrays_are_equal(read_process_memory(this.hprocess, this.from, "array"
+											   ,this.orginal_code._MaxIndex()), this.orginal_code)
 		{
-			if arrays_are_equal(read_process_memory(this.hprocess, this.from, "array"
-												   ,this.orginal_code._MaxIndex()), this.orginal_code)
-				{
-					if this._enable()
-						return memlib_sound(1)
-					else return memlib_sound(-1)
-				}	
-			else if arrays_are_equal(read_process_memory(this.hprocess, this.from, "array"
-														,this.jump_instruction._MaxIndex()), this.jump_instruction)	
-				{
-					if this._disable()
-						return memlib_sound(0)
-					else return memlib_sound(-1)
-				}	
+			if this._enable()
+				return memlib_sound(1)
+			else return memlib_sound(-1)
 		}	
+		else if arrays_are_equal(read_process_memory(this.hprocess, this.from, "array"
+													,this.jump_instruction._MaxIndex()), this.jump_instruction)	
+		{
+			if this._disable()
+				return memlib_sound(0)
+			else return memlib_sound(-1)
+		}	
+	}	
 
 	__Delete()	{
 		this._disable()
 		return dllcall("VirtualFreeEx", uint, this.hprocess, uint, this.to, uint, 0, uint, (MEM_RELEASE := 0x8000) )
 	}
-
 
 }
 
@@ -376,7 +365,7 @@ GetSystemInfo()
 }
 
 VirtualQueryEx(hprocess, base_adress)
- {
+{
 	varsetcapacity(MEMORY_BASIC_INFORMATION, 28)
 	success := dllcall("VirtualQueryEx"
 				  ,"Int", hProcess
@@ -393,16 +382,6 @@ VirtualQueryEx(hprocess, base_adress)
 		   ,numget(MEMORY_BASIC_INFORMATION, 12, "int32"), numget(MEMORY_BASIC_INFORMATION, 20, "int32")]
 }	
 
-class MemoryPage
-	{
-		__New(Base_, Alocation, Size)
-			{
-				this.base_ := base_
-				this.Size := Size
-				this.Alocation :=  Alocation
-			}
-	}		
-
 find_memory_pages(hprocess)
 {
 	r := GetSystemInfo()
@@ -412,17 +391,17 @@ find_memory_pages(hprocess)
 	pages := []
 	result := True	
 	while result
-		{
-			result :=  VirtualQueryEx(hprocess, Min)
-			if (result[4] && 0x10) and (result[2] && 0x10) ; PAGE_EXECUTE
-				pages.insert(new MemoryPaGe(result[1], result[4], result[3]))
-			Min := result[1] + result[3]
-		}	
+	{
+		result :=  VirtualQueryEx(hprocess, Min)
+		if (result[4] && 0x10) and (result[2] && 0x10) ; PAGE_EXECUTE
+			pages.insert({"base_" : result[1], "Alocation" : result[4], "Size" : result[3]})
+		Min := result[1] + result[3]
+	}	
 	for k, v in pages
-		{
-			Execute := v.Alocation && 0x10
-			;fileappend, % "BaseAdress:" v.base_ " Size:" v.size " Execute:" Execute "`n", *
-		}	
+	{
+		Execute := v.Alocation && 0x10
+		;fileappend, % "BaseAdress:" v.base_ " Size:" v.size " Execute:" Execute "`n", *
+	}	
 	return pages
 }
 
@@ -433,19 +412,19 @@ arrays_are_equal(a1, a2)
 	if not (isobject(a1) or not isobject(a2)) {
 		setformat, integer, %format%
 		return 0
-		}
+	}
 			
 	for k, v in a1
-		{
-			if a2[k] is not number {
-				setformat, integer, %format%
-				return 0
-				}
-			if (v != a2[k]) {
-				setformat, integer, %format%
-				return 0
-				}
+	{
+		if a2[k] is not number {
+			setformat, integer, %format%
+			return 0
 		}
+		if (v != a2[k]) {
+			setformat, integer, %format%
+			return 0
+		}
+	}
 
 	for k, v in a1
 		fileappend, % "arrays " v " " a2[k] "`n", *
@@ -457,20 +436,10 @@ arrays_are_equal(a1, a2)
 get_process_ID(_process)
 {
 	for k, v in get_process_list() {
-			if (v.name = _process)
-				return v.ID	
-		}	
+		if (v.name = _process)
+			return v.ID	
+	}	
 }
-
-class MODULEENTRY32
-{
-	__New(BaseAddr, BaseSize, Name)
-		{
-			this.BaseAddr := BaseAddr
-			this.BaseSize := BaseSize 
-			this.Name := Name			
-		}	
-}	
 
 get_modules_list64(proccessID)
 {
@@ -490,7 +459,7 @@ get_modules_list64(proccessID)
 		baseAdd := numget(&info+0, "ptr")
 		size := numget(&info+A_ptrsize, "uint")		
 		;fileappend, % "module: " mName " at:" baseAdd " size:" size "`n", *
-		mods.insert(new MODULEENTRY32(baseAdd, size, mName))						
+		mods.insert({"BaseAddr" : baseAdd, "BaseSize" : size, "Name" : mName})						
 	}
 	close_process_handle(hProcess)
 	return mods
@@ -510,19 +479,19 @@ get_modules_list(proccessID)
 	modules := []
 	varsetcapacity(module_info, 1061 , 0),	numput(1061, module_info, 0, "Int")
 	success := dllcall("Module32First", "Ptr", snapshot_handle, "Ptr", &module_info)
-	modules.insert(new MODULEENTRY32(numget(module_info, 20, "UInt")
-									,numget(module_info, 24, "UInt")
-									,strget(&module_info+32, 512, "UTF-8")))
+	modules.insert({"BaseAddr"   : numget(module_info, 20, "UInt")
+				   ,"BaseSize"   : numget(module_info, 24, "UInt")
+				   ,"Name"       : strget(&module_info+32, 512, "UTF-8")})
 									
 	;fileappend, % strget(module_info+32, 512, "UTF-8"), *
 	while success
-		{
-			varsetcapacity(module_info, 2061 , 0),	numput(1061, module_info, 0, "Int")
-			success := dllcall("Module32Next", "Ptr", snapshot_handle, "Ptr", &module_info)
-			modules.insert(new MODULEENTRY32(numget(module_info, 20, "UInt")
-									        ,numget(module_info, 24, "UInt")
-											,strget(&module_info+32, 512, "UTF-8"))) 
-		}	
+	{
+		varsetcapacity(module_info, 2061 , 0),	numput(1061, module_info, 0, "Int")
+		success := dllcall("Module32Next", "Ptr", snapshot_handle, "Ptr", &module_info)
+		modules.insert({"BaseAddr"   : numget(module_info, 20, "UInt")
+				           ,"BaseSize"   : numget(module_info, 24, "UInt")
+				           ,"Name"       : strget(&module_info+32, 512, "UTF-8")}) 
+	}	
 	return modules
 }
 
@@ -530,15 +499,15 @@ find_pages_in_range(hprocess, start, end_)
 {
 	pages := []
 	for k, v in find_memory_pages(hprocess)
+	{
+		;fileappend, % "BaseAdress:" v.base_ " Size:" v.size " ", *
+		if  ((v.base_ >= start) and (v.base_ + v.size <= end_))
 		{
-			;fileappend, % "BaseAdress:" v.base_ " Size:" v.size " ", *
-			if  ((v.base_ >= start) and (v.base_ + v.size <= end_))
-				{
-					;fileappend, in range `n, *	
-					pages.insert(v)
-				}	
-			;else fileappend, not in range `n, *				
+			;fileappend, in range `n, *	
+			pages.insert(v)
 		}	
+			;else fileappend, not in range `n, *				
+	}	
 	return pages		
 }	
 
@@ -562,28 +531,28 @@ read_process_struct(hProcess, byref struct, size, adress)
 find_module(name, id_process)
 {
 	for k, v in get_modules_list(id_process)
-		{
-			if (name = v.name)
-				return v			
-		}		
+	{
+		if (name = v.name)
+			return v			
+	}		
 }	
 
 aobscan(hprocess, id_process, module_name, bytes, dllname = "peixoto.dll", range_ = 1)
 {
 	static sigscan
 	if not sigscan
-		{
-			if not DllCall("LoadLibrary", "Str", dllname, "Ptr")
-				return "L " . dllname
+	{
+		if not DllCall("LoadLibrary", "Str", dllname, "Ptr")
+			return "L " . dllname
 			
-			dllModule := DllCall("GetModuleHandle", "wstr", dllname) 
-			if not dllModule
-				return "G " . dllname
+		dllModule := DllCall("GetModuleHandle", "wstr", dllname) 
+		if not dllModule
+			return "G " . dllname
 			
-			sigscan := dllCall("GetProcAddress", "int", dllModule, "astr", "sigscan")			
-			if not sigscan
-				return "S " . A_lasterror 
-		}	
+		sigscan := dllCall("GetProcAddress", "int", dllModule, "astr", "sigscan")			
+		if not sigscan
+			return "S " . A_lasterror 
+	}	
 	
 	module := find_module(module_name, id_process)
 	if not module
@@ -600,25 +569,23 @@ aobscan(hprocess, id_process, module_name, bytes, dllname = "peixoto.dll", range
 		return "P " range_
 	
 	for k, v in pages
-		{
-			varsetcapacity(pagemem, v.size)
-			varsetcapacity(buffer, bytes._maxindex(), 0)
-			loop, % bytes._MaxIndex()
-				Numput(bytes[A_index], buffer, A_index - 1, "UChar")
-			r := read_process_struct(hProcess, pagemem,  v.size, v.base_)	
+	{
+		varsetcapacity(pagemem, v.size)
+		varsetcapacity(buffer, bytes._maxindex(), 0)
+		loop, % bytes._MaxIndex()
+			Numput(bytes[A_index], buffer, A_index - 1, "UChar")
+		r := read_process_struct(hProcess, pagemem,  v.size, v.base_)	
 			  	
-			s := dllcall(sigscan
-						,"ptr", &pagemem, "int", v.size
-						,"ptr", &buffer, "int", bytes._maxindex())					
+		s := dllcall(sigscan
+					,"ptr", &pagemem, "int", v.size
+					,"ptr", &buffer, "int", bytes._maxindex())					
 						
-			varsetcapacity(pagemem, 0)
-			varsetcapacity(buffer, 0)
+		varsetcapacity(pagemem, 0)
+		varsetcapacity(buffer, 0)
 			
-			if (s > 0)			
-					return v.base_ + s
-									
-		}	
-	
+		if (s > 0)			
+			return v.base_ + s
+	}	
 	return
 }	
 
@@ -632,12 +599,12 @@ CreateIdleProcess(Target, workingdir = "", args = "", noWindow = "")
 	numput(9*4 + 2*2 + 7*A_ptrsize, STARTUPINFO, 0 , "uint")	    
    
     if not workingdir
-		{
-			SplitPath, Target, OutFileName, OutDir
-			if not OutDir
-				workingdir := A_WorkingDir 
-			else workingdir := OutDir
-		}	
+	{
+		SplitPath, Target, OutFileName, OutDir
+		if not OutDir
+			workingdir := A_WorkingDir 
+		else workingdir := OutDir
+	}	
 		
 	flags := (CREATE_SUSPENDED := 0x00000004)
 	if noWindow
@@ -682,18 +649,18 @@ BlockNewProcess(parent_id, child_list)
 	{
 		h_app := ""
 		while not h_app
-			{
-				process, exist, %parent_id%
-				if not errorlevel
-					return
-				
-				h_app := get_process_handle(v, (PROCESS_CREATE_THREAD := 0x0002)
-										   | (PROCESS_QUERY_INFORMATION := 0x0400) 
-										   | (PROCESS_VM_OPERATION := 0x0008) 
-								           | (PROCESS_VM_READ := 0x0010) 
-										   | (PROCESS_VM_WRITE := 0x0020))	
-				sleep, 100									   
-			}
+		{
+			process, exist, %parent_id%
+			if not errorlevel
+				return
+					
+			h_app := get_process_handle(v, (PROCESS_CREATE_THREAD := 0x0002)
+									   | (PROCESS_QUERY_INFORMATION := 0x0400) 
+									   | (PROCESS_VM_OPERATION := 0x0008) 
+									   | (PROCESS_VM_READ := 0x0010) 
+									   | (PROCESS_VM_WRITE := 0x0020))	
+			sleep, 100									   
+		}
 		dllcallEx(h_app, "Kernel32.dll", "ExitProcess", "0")		
 	}
 }	
@@ -764,15 +731,15 @@ EnumProcessModules(hprocess)
 				,"Uint*", required_size)
 				
 	if 	(size < required_size)
-		{
-			VarSetCapacity(module, required_size)
-			VarSetCapacity(required_size, 4, 0)
-			r := dllcall("psapi.dll\EnumProcessModules" 
-						,"int", hProcess
-						,"Uint", &module
-						,"Int", 1024
-						,"Uint*", required_size)
-		}				
+	{
+		VarSetCapacity(module, required_size)
+		VarSetCapacity(required_size, 4, 0)
+		r := dllcall("psapi.dll\EnumProcessModules" 
+					,"int", hProcess
+					,"Uint", &module
+					,"Int", 1024
+					,"Uint*", required_size)
+	}				
 			
 	;fileappend, % errorlevel "`n", *
 	;fileappend, % r "`n", *
@@ -780,12 +747,12 @@ EnumProcessModules(hprocess)
 	n := 0
 	modules := []
 	while not (n > required_size)
-		{
-			h_module := numget(module, n, "int")
-			;fileappend, % n ": " h_module GetModuleFileNameEx(hprocess, h_module) "`n", *
-			modules.insert(h_module)
-			n += 4
-		}	
+	{
+		h_module := numget(module, n, "int")
+		;fileappend, % n ": " h_module GetModuleFileNameEx(hprocess, h_module) "`n", *
+		modules.insert(h_module)
+		n += 4
+	}	
 	;fileappend, % required_size "`n", *
 	return modules	
 }	
@@ -794,10 +761,10 @@ Get_Module_handle(hprocess, module)
 {
 	modules := EnumProcessModules(hprocess)	
 	for k, v in modules
-		{
-			if GetModuleFileNameEx(hprocess, v) = module
-				return v
-		}				
+	{
+		if GetModuleFileNameEx(hprocess, v) = module
+			return v
+	}				
 }	
 
 Get_module_memory_space(hprocess, module)
