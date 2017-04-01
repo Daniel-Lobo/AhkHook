@@ -44,10 +44,14 @@ __new(hook, dll, function2hook, callback_options = "F")
 	this.Trampoline  := function2hook_add	
 }
 
+
 __delete()
 {
-	if ! (dllcall(this.unhook, "Ptr*", This.OriginalPtr, "Ptr", this.Trampoline))
-		DllCall("GlobalFree", "Ptr", this.hook_callback, "Ptr")
+	if ( (this.unhook) and (This.OriginalPtr) and (this.Trampoline))
+	{
+		if ! (dllcall(this.unhook, "Ptr*", This.OriginalPtr, "Ptr", this.Trampoline))
+			DllCall("GlobalFree", "Ptr", this.hook_callback, "Ptr")
+	}
 }
 
 }
